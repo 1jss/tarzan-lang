@@ -1,0 +1,3 @@
+var first_var = 83 * 100 + 83;
+var second_var = first_var - 8382;
+(2 * (first_var + 2727 + second_var) + 3)
