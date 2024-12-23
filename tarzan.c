@@ -54,9 +54,24 @@ const Operators operators = {
 // Parse a number from the file data
 Number parse_number() {
   Number number = {.value = 0, .exponent = 0};
-  while (file_data[read_position] >= '0' && file_data[read_position] <= '9') {
-    number.value = number.value * 10 + file_data[read_position] - '0';
+  // Check if the number is negative
+  bool negative = file_data[read_position] == '-';
+  read_position += negative ? 1 : 0;
+
+  bool decimal = false;
+  while ((file_data[read_position] >= '0' && file_data[read_position] <= '9') || file_data[read_position] == '.') {
+    if (file_data[read_position] == '.') {
+      decimal = true;
+    } else {
+      number.value = number.value * 10 + file_data[read_position] - '0';
+      if (decimal) {
+        number.exponent -= 1;
+      }
+    }
     read_position += 1;
+  }
+  if (negative) {
+    number.value = -number.value;
   }
   return number;
 }
@@ -97,15 +112,32 @@ Number parse_get_variable() {
   return value;
 }
 
-// Helper function to align exponents
+// Takes two numbers and aligns them at the lowest exponent
 void align_exponents(Number *a, Number *b) {
-  if (a->exponent > b->exponent) {
-    b->value *= pow(10, a->exponent - b->exponent);
+  if (a->exponent < b->exponent) {
+    b->value *= pow(10, b->exponent - a->exponent);
     b->exponent = a->exponent;
-  } else if (a->exponent < b->exponent) {
-    a->value *= pow(10, b->exponent - a->exponent);
+  } else if (a->exponent > b->exponent) {
+    a->value *= pow(10, a->exponent - b->exponent);
     a->exponent = b->exponent;
   }
+}
+
+// Takes a number and adds a number of decimals to it
+void add_decimals(Number *number, i32 decimals) {
+  number->value *= pow(10, decimals);
+  number->exponent -= decimals;
+}
+
+Number divide_numbers(Number *a, Number *b) {
+  Number result = {.value = 0, .exponent = 0};
+  if (b->value != 0) {
+    // Add 3 decimals
+    add_decimals(a, 3 + abs(a->exponent));
+    result.value = a->value / b->value;
+    result.exponent = a->exponent - b->exponent;
+  }
+  return result;
 }
 
 // Evaluate an expression
@@ -125,27 +157,22 @@ Number evaluate_expression() {
     // If operator
     if (is_token("+")) {
       read_position += 1;
-      printf("found +\n");
       op_code = op_code == 0 ? operators.plus : op_code;
       op_code2 = op_code > 0 ? operators.plus : 0;
     } else if (is_token("-")) {
       read_position += 1;
-      printf("found -\n");
       op_code = op_code == 0 ? operators.minus : op_code;
       op_code2 = op_code > 0 ? operators.minus : 0;
     } else if (is_token("*")) {
       read_position += 1;
-      printf("found *\n");
       op_code = op_code == 0 ? operators.multiply : op_code;
       op_code2 = op_code > 0 ? operators.multiply : 0;
     } else if (is_token("/")) {
       read_position += 1;
-      printf("found /\n");
       op_code = op_code == 0 ? operators.divide : op_code;
       op_code2 = op_code > 0 ? operators.divide : 0;
     } else if (file_data[read_position] >= '0' && file_data[read_position] <= '9') {
       Number number = parse_number();
-      printf("found number: %lld\n", number.value);
       if (parsed_numbers == 0) {
         first_number = number;
         parsed_numbers += 1;
@@ -193,14 +220,13 @@ Number evaluate_expression() {
     }
     // Run calculation if we have three numbers, to make room for the next number
     if (parsed_numbers == 3) {
-      // Align exponents before calculation
-      align_exponents(&second_number, &third_number);
       // If second operator has higher priority, run it first
       if (op_code2 == operators.multiply || op_code2 == operators.divide) {
+        align_exponents(&second_number, &third_number);
         if (op_code2 == operators.multiply) {
           second_number.value *= third_number.value;
         } else if (op_code2 == operators.divide) {
-          second_number.value /= third_number.value;
+          second_number = divide_numbers(&second_number, &third_number);
         }
       }
       // Run only the first operator and move the third operator
@@ -213,7 +239,7 @@ Number evaluate_expression() {
         } else if (op_code == operators.multiply) {
           first_number.value *= second_number.value;
         } else if (op_code == operators.divide) {
-          first_number.value /= second_number.value;
+          first_number = divide_numbers(&first_number, &second_number);
         }
         // Move third number to second number slot
         second_number = third_number;
@@ -235,7 +261,8 @@ Number evaluate_expression() {
     } else if (op_code == operators.multiply) {
       result.value = first_number.value * second_number.value;
     } else if (op_code == operators.divide) {
-      result.value = first_number.value / second_number.value;
+      result = divide_numbers(&first_number, &second_number);
+      first_number.exponent = result.exponent;
     }
     result.exponent = first_number.exponent;
   }
@@ -370,6 +397,9 @@ i32 parse_token() {
   } else if (is_token("while")) {
     printf("while\n");
     read_position += 5;
+  } else if (is_token("//")) {
+    printf("comment\n");
+    skip_line();
   } else {
     handle_other();
   }
