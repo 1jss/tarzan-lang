@@ -1,13 +1,13 @@
+#include <math.h> // pow
 #include <stdbool.h> // bool
 #include <stdio.h> // printf, fprintf, putchar, FILE, fgetc, EOF
 #include <stdlib.h> // fopen, fclose
+#include <string.h> // strlen, strcmp, memcpy
 #include "include/arena.h" // arena
 #include "include/array.h" // array
 #include "include/types.h" // i32
 
 // Tarzan is a tiny interpreted language with C-like syntax. This file includes a simple line-by-line interpreter.
-
-i64 parse_token();
 
 // Global variables
 u8 *file_data = 0; // File data
@@ -25,18 +25,17 @@ bool is_token(const char *token) {
   return memcmp(file_data + read_position, token, token_length) == 0;
 }
 
-// Variable struct
-typedef struct {
-  i64 value;
-  char *name;
-} Variable;
-
-// Maybe use a number with exponent instead of float?
+// Number struct
 typedef struct {
   i64 value;
   i16 exponent;
-  char *name; // Optional variable name
 } Number;
+
+// Variable struct
+typedef struct {
+  Number value;
+  char *name;
+} Variable;
 
 typedef struct {
   u8 plus;
@@ -53,17 +52,17 @@ const Operators operators = {
 };
 
 // Parse a number from the file data
-i64 parse_number() {
-  i64 number = 0;
+Number parse_number() {
+  Number number = {.value = 0, .exponent = 0};
   while (file_data[read_position] >= '0' && file_data[read_position] <= '9') {
-    number = number * 10 + file_data[read_position] - '0';
+    number.value = number.value * 10 + file_data[read_position] - '0';
     read_position += 1;
   }
   return number;
 }
 
 // Parses out a variable name and returns its value
-i64 parse_get_variable() {
+Number parse_get_variable() {
   printf("parse_get_variable\n");
   i32 name_length = 0;
   // Store a pointer to the start of the variable name
@@ -82,11 +81,11 @@ i64 parse_get_variable() {
   // Null terminate the string
   variable_name[name_length] = '\0';
 
-  i64 value = 0;
+  Number value = {.value = 0, .exponent = 0};
   bool value_found = false;
   i32 iterator = array_length(variables) - 1;
   // Search for the variable in the variables array starting from the most recently added variables
-  while(iterator >= 0 && !value_found) {
+  while (iterator >= 0 && !value_found) {
     Variable *variable = (Variable *)array_get(variables, iterator);
     if (strcmp(variable->name, variable_name) == 0) {
       value = variable->value;
@@ -98,12 +97,24 @@ i64 parse_get_variable() {
   return value;
 }
 
-i64 evaluate_expression() {
-  i64 result = 0;
+// Helper function to align exponents
+void align_exponents(Number *a, Number *b) {
+  if (a->exponent > b->exponent) {
+    b->value *= pow(10, a->exponent - b->exponent);
+    b->exponent = a->exponent;
+  } else if (a->exponent < b->exponent) {
+    a->value *= pow(10, b->exponent - a->exponent);
+    a->exponent = b->exponent;
+  }
+}
+
+// Evaluate an expression
+Number evaluate_expression() {
+  Number result = {.value = 0, .exponent = 0};
   u8 parsed_numbers = 0; // Keep track of current parser window
-  i64 first_number = 0;
-  i64 second_number = 0;
-  i64 third_number = 0; // For the case of a + b * c, we want to wait with the addition until we know the result of the multiplication
+  Number first_number = {.value = 0, .exponent = 0};
+  Number second_number = {.value = 0, .exponent = 0};
+  Number third_number = {.value = 0, .exponent = 0}; // For the case of a + b * c, we want to wait with the addition until we know the result of the multiplication
   u8 op_code = 0; // 1 = plus, 2 = minus, 3 = multiply, 4 = divide
   u8 op_code2 = 0;
   // Read the first number
@@ -133,8 +144,8 @@ i64 evaluate_expression() {
       op_code = op_code == 0 ? operators.divide : op_code;
       op_code2 = op_code > 0 ? operators.divide : 0;
     } else if (file_data[read_position] >= '0' && file_data[read_position] <= '9') {
-      i64 number = parse_number();
-      printf("found number: %lld\n", number);
+      Number number = parse_number();
+      printf("found number: %lld\n", number.value);
       if (parsed_numbers == 0) {
         first_number = number;
         parsed_numbers += 1;
@@ -149,7 +160,7 @@ i64 evaluate_expression() {
     // if variable name
     else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
       printf("found variable\n");
-      i64 variable = parse_get_variable();
+      Number variable = parse_get_variable();
       if (parsed_numbers == 0) {
         first_number = variable;
         parsed_numbers += 1;
@@ -165,7 +176,7 @@ i64 evaluate_expression() {
     else if (is_token("(")) {
       printf("found (\n");
       read_position += 1;
-      i64 block_result = evaluate_expression();
+      Number block_result = evaluate_expression();
       read_position += 1;
       if (parsed_numbers == 0) {
         first_number = block_result;
@@ -182,52 +193,57 @@ i64 evaluate_expression() {
     }
     // Run calculation if we have three numbers, to make room for the next number
     if (parsed_numbers == 3) {
+      // Align exponents before calculation
+      align_exponents(&second_number, &third_number);
       // If second operator has higher priority, run it first
       if (op_code2 == operators.multiply || op_code2 == operators.divide) {
         if (op_code2 == operators.multiply) {
-          second_number *= third_number;
+          second_number.value *= third_number.value;
         } else if (op_code2 == operators.divide) {
-          second_number /= third_number;
+          second_number.value /= third_number.value;
         }
       }
       // Run only the first operator and move the third operator
       else {
+        align_exponents(&first_number, &second_number);
         if (op_code == operators.plus) {
-          first_number += second_number;
+          first_number.value += second_number.value;
         } else if (op_code == operators.minus) {
-          first_number -= second_number;
+          first_number.value -= second_number.value;
         } else if (op_code == operators.multiply) {
-          first_number *= second_number;
+          first_number.value *= second_number.value;
         } else if (op_code == operators.divide) {
-          first_number /= second_number;
+          first_number.value /= second_number.value;
         }
         // Move third number to second number slot
         second_number = third_number;
         op_code = op_code2;
       }
       // Reset third number
-      third_number = 0;
+      third_number = (Number){.value = 0, .exponent = 0};
       op_code2 = 0;
       parsed_numbers = 2;
     }
   } // end while - has reached end of expression
   // If there are two numbers, run the operator
   if (parsed_numbers == 2) {
+    align_exponents(&first_number, &second_number);
     if (op_code == operators.plus) {
-      result = first_number + second_number;
+      result.value = first_number.value + second_number.value;
     } else if (op_code == operators.minus) {
-      result = first_number - second_number;
+      result.value = first_number.value - second_number.value;
     } else if (op_code == operators.multiply) {
-      result = first_number * second_number;
+      result.value = first_number.value * second_number.value;
     } else if (op_code == operators.divide) {
-      result = first_number / second_number;
+      result.value = first_number.value / second_number.value;
     }
+    result.exponent = first_number.exponent;
   }
   // If there is only one number, return it
   else if (parsed_numbers == 1) {
     result = first_number;
   }
-  printf("evaluate_expression result: %lld\n", result);
+  printf("evaluate_expression result: %lld * 10^%d\n", result.value, result.exponent);
   return result;
 }
 
@@ -262,7 +278,7 @@ i64 parse_set_variable() {
     read_position += 1;
   }
   // Get the value
-  i64 value = evaluate_expression();
+  Number value = evaluate_expression();
 
   // Push the variable to the variables array
   Variable new_variable = {
@@ -323,7 +339,7 @@ i64 handle_other() {
 }
 
 // Recursive function that reads at a given position and returns the new position
-i64 parse_token() {
+i32 parse_token() {
   // Skip spaces
   while (is_token(" ") || is_token("\n")) {
     read_position += 1;
@@ -332,8 +348,8 @@ i64 parse_token() {
   if (is_token("(")) {
     printf("start paren\n");
     read_position += 1;
-    i64 result = evaluate_expression();
-    printf("result: %lld\n", result);
+    Number result = evaluate_expression();
+    printf("result: %lld * 10^%d\n", result.value, result.exponent);
     read_position += 1;
   } else if (is_token(")")) {
     read_position += 1;
