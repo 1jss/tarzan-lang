@@ -1,5 +1,6 @@
-(100 / 3 * 3)
-(0.02 + 0.003)
+var frac = 100 / 3;
+var hundred = frac * 3;
+// (0.02 + 0.003)
 // var first_var = 83 * 100 + 83;
 // var second_var = first_var - 8382;
 // (2 * (first_var + 2727 + second_var) + 3)

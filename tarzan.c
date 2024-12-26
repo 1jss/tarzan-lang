@@ -140,6 +140,15 @@ Number divide_numbers(Number *a, Number *b) {
   return result;
 }
 
+Number compact_number(Number number) {
+  Number result = number;
+  while (result.value % 10 == 0 && result.value != 0) {
+    result.value /= 10;
+    result.exponent += 1;
+  }
+  return result;
+}
+
 // Evaluate an expression
 Number evaluate_expression() {
   Number result = {.value = 0, .exponent = 0};
@@ -225,6 +234,7 @@ Number evaluate_expression() {
         align_exponents(&second_number, &third_number);
         if (op_code2 == operators.multiply) {
           second_number.value *= third_number.value;
+          second_number.exponent += third_number.exponent;
         } else if (op_code2 == operators.divide) {
           second_number = divide_numbers(&second_number, &third_number);
         }
@@ -238,6 +248,7 @@ Number evaluate_expression() {
           first_number.value -= second_number.value;
         } else if (op_code == operators.multiply) {
           first_number.value *= second_number.value;
+          first_number.exponent += second_number.exponent;
         } else if (op_code == operators.divide) {
           first_number = divide_numbers(&first_number, &second_number);
         }
@@ -260,6 +271,7 @@ Number evaluate_expression() {
       result.value = first_number.value - second_number.value;
     } else if (op_code == operators.multiply) {
       result.value = first_number.value * second_number.value;
+      first_number.exponent += second_number.exponent;
     } else if (op_code == operators.divide) {
       result = divide_numbers(&first_number, &second_number);
       first_number.exponent = result.exponent;
@@ -270,6 +282,8 @@ Number evaluate_expression() {
   else if (parsed_numbers == 1) {
     result = first_number;
   }
+  // Compact the result number by removing trailing zeros
+  result = compact_number(result);
   printf("evaluate_expression result: %lld * 10^%d\n", result.value, result.exponent);
   return result;
 }
