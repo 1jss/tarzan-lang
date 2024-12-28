@@ -9,12 +9,20 @@
 
 // Tarzan is a tiny interpreted language with C-like syntax. This file includes a simple line-by-line interpreter.
 
+// TODO:
+// - [x] Add if
+// - [x] Add logical condition evaluation
+// - [x] Add else
+// - [ ] Add while
+// - [ ] Add string type
+
 // Global variables
 u8 *file_data = 0; // File data
 i64 file_size = 0; // File size
 Arena *arena = 0; // Arena for memory allocation
 Array *variables = 0; // Variables
 i64 read_position = 0;
+Array *block_skip_stack = 0; // Stack for if and else blocks
 
 const i32 success = 0;
 const i32 error = 1;
@@ -49,6 +57,22 @@ const Operators operators = {
   .minus = 2,
   .multiply = 3,
   .divide = 4
+};
+
+typedef struct {
+  u8 equal_to;
+  u8 less_than;
+  u8 greater_than;
+  u8 less_than_or_equal_to;
+  u8 greater_than_or_equal_to;
+} Comparators;
+
+const Comparators comparators = {
+  .equal_to = 1,
+  .less_than = 2,
+  .greater_than = 3,
+  .less_than_or_equal_to = 4,
+  .greater_than_or_equal_to = 5
 };
 
 // Parse a number from the file data
@@ -158,8 +182,7 @@ Number evaluate_expression() {
   Number third_number = {.value = 0, .exponent = 0}; // For the case of a + b * c, we want to wait with the addition until we know the result of the multiplication
   u8 op_code = 0; // 1 = plus, 2 = minus, 3 = multiply, 4 = divide
   u8 op_code2 = 0;
-  // Read the first number
-  while (!is_token(")") && !is_token(";") && read_position < file_size) {
+  while (!is_token(")") && !is_token(";") && !is_token("<") && !is_token(">") && !is_token("=") && read_position < file_size) {
     while (is_token(" ")) {
       read_position += 1;
     }
@@ -379,7 +402,66 @@ i64 handle_other() {
   return success;
 }
 
-// Recursive function that reads at a given position and returns the new position
+void skip_spaces() {
+  while (is_token(" ") && read_position < file_size) {
+    read_position += 1;
+  }
+}
+
+// Skips following else blocks after an if or else if block
+void skip_elses() {
+  printf("skip_elses\n");
+  while (is_token("else") && read_position < file_size) {
+    read_position += 4;
+    enter_block();
+    skip_block();
+    skip_spaces();
+  }
+}
+
+bool evaluate_condition() {
+  printf("evaluate_condition\n");
+  Number first_number = evaluate_expression();
+  skip_spaces();
+  // Get the operator
+  u8 comparator = 0;
+  if (is_token("==")) {
+    comparator = comparators.equal_to;
+    read_position += 2;
+  } else if (is_token("<=")) {
+    comparator = comparators.less_than_or_equal_to;
+    read_position += 2;
+  } else if (is_token("<")) {
+    comparator = comparators.less_than;
+    read_position += 1;
+  } else if (is_token(">=")) {
+    comparator = comparators.greater_than_or_equal_to;
+    read_position += 2;
+  } else if (is_token(">")) {
+    comparator = comparators.greater_than;
+    read_position += 1;
+  }
+  skip_spaces();
+  Number second_number = evaluate_expression();
+  align_exponents(&first_number, &second_number);
+
+  // Compare the numbers
+  bool result = false;
+  if (comparator == comparators.equal_to) {
+    result = first_number.value == second_number.value;
+  } else if (comparator == comparators.less_than) {
+    result = first_number.value < second_number.value;
+  } else if (comparator == comparators.greater_than) {
+    result = first_number.value > second_number.value;
+  } else if (comparator == comparators.less_than_or_equal_to) {
+    result = first_number.value <= second_number.value;
+  } else if (comparator == comparators.greater_than_or_equal_to) {
+    result = first_number.value >= second_number.value;
+  }
+  return result;
+}
+
+// Parser function
 i32 parse_token() {
   // Skip spaces
   while (is_token(" ") || is_token("\n")) {
@@ -398,16 +480,46 @@ i32 parse_token() {
   } else if (is_token("}")) {
     read_position += 1;
     printf("end block\n");
+    bool *skip_block = (bool *)array_pop(block_skip_stack);
+    if (skip_block != 0 && *skip_block) {
+      printf("skip_block: %d\n", *skip_block);
+      skip_spaces();
+      skip_elses();
+    }
   } else if (is_token("if")) {
-    printf("if\n");
     read_position += 2;
-    enter_block();
-    skip_block();
+    printf("if statement\n");
+    skip_spaces();
+    read_position += 1; // skip start parenthesis
+    if (evaluate_condition()) {
+      printf("if statement was true\n");
+      array_push(block_skip_stack, &(bool){true});
+      enter_block();
+    } else {
+      printf("if statement was false\n");
+      array_push(block_skip_stack, &(bool){false});
+      enter_block();
+      skip_block();
+    }
+  } else if (is_token("else if")) {
+    read_position += 7;
+    printf("else if statement\n");
+    skip_spaces();
+    read_position += 1; // skip start parenthesis
+    if (evaluate_condition()) {
+      printf("else if statement was true\n");
+      array_push(block_skip_stack, &(bool){true});
+      enter_block();
+    } else {
+      printf("else if statement was false\n");
+      array_push(block_skip_stack, &(bool){false});
+      enter_block();
+      skip_block();
+    }
   } else if (is_token("else")) {
-    printf("else\n");
     read_position += 4;
+    printf("else\n");
     enter_block();
-    skip_block();
   } else if (is_token("while")) {
     printf("while\n");
     read_position += 5;
@@ -441,6 +553,7 @@ i32 main(i32 arg_count, char *arguments[]) {
   fread(file_data, 1, file_size, file);
 
   variables = array_create(arena, sizeof(Variable));
+  block_skip_stack = array_create(arena, sizeof(bool));
 
   // Parse the file
   while (read_position < file_size) {
