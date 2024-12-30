@@ -15,6 +15,9 @@
 // - [x] Add else
 // - [ ] Add while
 // - [ ] Add string type
+// - [ ] Add print statement
+// - [ ] Add function declaration
+// - [ ] Add function call
 
 // Global variables
 u8 *file_data = 0; // File data
@@ -22,7 +25,7 @@ i64 file_size = 0; // File size
 Arena *arena = 0; // Arena for memory allocation
 Array *variables = 0; // Variables
 i64 read_position = 0;
-Array *block_skip_stack = 0; // Stack for if and else blocks
+Array *jump_stack = 0; // Jump stack determines what happens when a block ends
 
 const i32 success = 0;
 const i32 error = 1;
@@ -32,6 +35,28 @@ bool is_token(const char *token) {
   if (read_position + token_length > file_size) return false;
   return memcmp(file_data + read_position, token, token_length) == 0;
 }
+
+typedef struct {
+  u8 skip_else; // if-else blocks
+  u8 iterate; // while blocks
+} JumpTypes;
+
+// Block ends for different block types
+const JumpTypes jumps = {
+  .skip_else = 1,
+  .iterate = 2,
+};
+
+// Block types for the block stack
+typedef struct {
+  u8 type; // jump type
+  i64 index; // stored read position
+} Jump;
+
+Jump skip_else_jump = {
+  .type = 1,
+  .index = 0
+};
 
 // Number struct
 typedef struct {
@@ -466,7 +491,7 @@ i32 parse_token() {
   // Skip spaces
   while (is_token(" ") || is_token("\n")) {
     read_position += 1;
-    printf("space or newline\n");
+    // printf("space or newline\n");
   }
   if (is_token("(")) {
     printf("start paren\n");
@@ -480,9 +505,9 @@ i32 parse_token() {
   } else if (is_token("}")) {
     read_position += 1;
     printf("end block\n");
-    bool *skip_block = (bool *)array_pop(block_skip_stack);
-    if (skip_block != 0 && *skip_block) {
-      printf("skip_block: %d\n", *skip_block);
+    Jump *jump = (Jump *)array_pop(jump_stack);
+    if (jump != 0 && jump->type == jumps.skip_else) {
+      printf("skip_block: %d\n", jump->type);
       skip_spaces();
       skip_elses();
     }
@@ -493,11 +518,10 @@ i32 parse_token() {
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
       printf("if statement was true\n");
-      array_push(block_skip_stack, &(bool){true});
+      array_push(jump_stack, &skip_else_jump);
       enter_block();
     } else {
       printf("if statement was false\n");
-      array_push(block_skip_stack, &(bool){false});
       enter_block();
       skip_block();
     }
@@ -508,11 +532,10 @@ i32 parse_token() {
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
       printf("else if statement was true\n");
-      array_push(block_skip_stack, &(bool){true});
+      array_push(jump_stack, &skip_else_jump);
       enter_block();
     } else {
       printf("else if statement was false\n");
-      array_push(block_skip_stack, &(bool){false});
       enter_block();
       skip_block();
     }
@@ -553,7 +576,7 @@ i32 main(i32 arg_count, char *arguments[]) {
   fread(file_data, 1, file_size, file);
 
   variables = array_create(arena, sizeof(Variable));
-  block_skip_stack = array_create(arena, sizeof(bool));
+  jump_stack = array_create(arena, sizeof(Jump));
 
   // Parse the file
   while (read_position < file_size) {
