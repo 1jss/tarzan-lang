@@ -1,6 +1,11 @@
-var iterator = 0;
-while (iterator < 10) {
-  var iterator = iterator + 1;
+var i = 0;
+while (i < 5) {
+  var i = i + 1;
+  var j = 0;
+  while (j < 5) {
+    var j = j + 1;
+    (i * j)
+  }
 }
 
 

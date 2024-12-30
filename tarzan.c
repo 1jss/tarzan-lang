@@ -18,6 +18,7 @@
 // - [ ] Add print statement
 // - [ ] Add function declaration
 // - [ ] Add function call
+// - [ ] Add undefined Number value
 
 // Global variables
 u8 *file_data = 0; // File data
@@ -127,7 +128,7 @@ Number parse_number() {
 
 // Parses out a variable name and returns its value
 Number parse_get_variable() {
-  printf("parse_get_variable\n");
+  // printf("parse_get_variable\n");
   i32 name_length = 0;
   // Store a pointer to the start of the variable name
   u8 *name_start = &file_data[read_position];
@@ -243,7 +244,7 @@ Number evaluate_expression() {
     }
     // if variable name
     else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
-      printf("found variable\n");
+      // printf("found variable\n");
       Number variable = parse_get_variable();
       if (parsed_numbers == 0) {
         first_number = variable;
@@ -258,7 +259,7 @@ Number evaluate_expression() {
     }
     // if new block
     else if (is_token("(")) {
-      printf("found (\n");
+      // printf("found (\n");
       read_position += 1;
       Number block_result = evaluate_expression();
       read_position += 1;
@@ -273,7 +274,7 @@ Number evaluate_expression() {
         parsed_numbers += 1;
       }
     } else {
-      printf("Unknown token in eval\n");
+      // printf("Unknown token in eval\n");
     }
     // Run calculation if we have three numbers, to make room for the next number
     if (parsed_numbers == 3) {
@@ -332,13 +333,13 @@ Number evaluate_expression() {
   }
   // Compact the result number by removing trailing zeros
   result = compact_number(result);
-  printf("evaluate_expression result: %lld * 10^%d\n", result.value, result.exponent);
+  // printf("evaluate_expression result: %lld * 10^%d\n", result.value, result.exponent);
   return result;
 }
 
 // Parses a variable and sets it in the variables array
 i64 parse_set_variable() {
-  printf("parse_set_variable\n");
+  // printf("parse_set_variable\n");
 
   // Skip spaces
   while (is_token(" ")) {
@@ -380,7 +381,7 @@ i64 parse_set_variable() {
 }
 
 i64 enter_block() {
-  printf("enter_block\n");
+  // printf("enter_block\n");
   while (!is_token("{") && read_position < file_size) {
     read_position += 1;
   }
@@ -390,7 +391,7 @@ i64 enter_block() {
 }
 
 i64 skip_block() {
-  printf("skip_block\n");
+  // printf("skip_block\n");
   i32 block_count = 1;
   while (block_count > 0 && read_position < file_size) {
     if (is_token("{")) {
@@ -404,7 +405,7 @@ i64 skip_block() {
 }
 
 i64 skip_line() {
-  printf("skip_line\n");
+  // printf("skip_line\n");
   while (!is_token("\n") && read_position < file_size) {
     read_position += 1;
   }
@@ -416,12 +417,12 @@ i64 skip_line() {
 // Assignment or function call
 i64 handle_other() {
   if (is_token("var")) {
-    printf("new variable\n");
+    // printf("new variable\n");
     read_position += 3;
     // Read the variable name and value and add it to the variables array
     parse_set_variable();
   } else {
-    printf("Unknown token\n");
+    // printf("Unknown token\n");
     read_position += 1;
   }
   return success;
@@ -435,7 +436,7 @@ void skip_spaces() {
 
 // Skips following else blocks after an if or else if block
 void skip_elses() {
-  printf("skip_elses\n");
+  // printf("skip_elses\n");
   while (is_token("else") && read_position < file_size) {
     read_position += 4;
     enter_block();
@@ -445,7 +446,7 @@ void skip_elses() {
 }
 
 bool evaluate_condition() {
-  printf("evaluate_condition\n");
+  // printf("evaluate_condition\n");
   Number first_number = evaluate_expression();
   skip_spaces();
   // Get the operator
@@ -494,59 +495,59 @@ i32 parse_token() {
     // printf("space or newline\n");
   }
   if (is_token("(")) {
-    printf("start paren\n");
+    // printf("start paren\n");
     read_position += 1;
     Number result = evaluate_expression();
     printf("result: %lld * 10^%d\n", result.value, result.exponent);
     read_position += 1;
   } else if (is_token(")")) {
     read_position += 1;
-    printf("end paren\n");
+    // printf("end paren\n");
   } else if (is_token("}")) {
     read_position += 1;
-    printf("end block\n");
+    // printf("end block\n");
     Jump *jump = (Jump *)array_pop(jump_stack);
     if (jump != 0) {
       if (jump->type == jumps.skip_else) {
-        printf("skip_block: %d\n", jump->type);
+        // printf("skip_block: %d\n", jump->type);
         skip_spaces();
         skip_elses();
       } else if (jump->type == jumps.iterate) {
-        printf("iterate\n");
+        // printf("iterate\n");
         read_position = jump->index;
       }
     }
   } else if (is_token("if")) {
     read_position += 2;
-    printf("if statement\n");
+    // printf("if statement\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      printf("if statement was true\n");
+      // printf("if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
     } else {
-      printf("if statement was false\n");
+      // printf("if statement was false\n");
       enter_block();
       skip_block();
     }
   } else if (is_token("else if")) {
     read_position += 7;
-    printf("else if statement\n");
+    // printf("else if statement\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      printf("else if statement was true\n");
+      // printf("else if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
     } else {
-      printf("else if statement was false\n");
+      // printf("else if statement was false\n");
       enter_block();
       skip_block();
     }
   } else if (is_token("else")) {
     read_position += 4;
-    printf("else\n");
+    // printf("else\n");
     enter_block();
   } else if (is_token("while")) {
     Jump iteration_jump = {
@@ -554,20 +555,20 @@ i32 parse_token() {
       .index = read_position
     };
     read_position += 5;
-    printf("while\n");
+    // printf("while\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      printf("while condition was true\n");
+      // printf("while condition was true\n");
       array_push(jump_stack, &iteration_jump);
       enter_block();
     } else {
-      printf("while condition was false\n");
+      // printf("while condition was false\n");
       enter_block();
       skip_block();
     }
   } else if (is_token("//")) {
-    printf("comment\n");
+    // printf("comment\n");
     skip_line();
   } else {
     handle_other();
