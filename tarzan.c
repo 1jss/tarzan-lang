@@ -506,10 +506,15 @@ i32 parse_token() {
     read_position += 1;
     printf("end block\n");
     Jump *jump = (Jump *)array_pop(jump_stack);
-    if (jump != 0 && jump->type == jumps.skip_else) {
-      printf("skip_block: %d\n", jump->type);
-      skip_spaces();
-      skip_elses();
+    if (jump != 0) {
+      if (jump->type == jumps.skip_else) {
+        printf("skip_block: %d\n", jump->type);
+        skip_spaces();
+        skip_elses();
+      } else if (jump->type == jumps.iterate) {
+        printf("iterate\n");
+        read_position = jump->index;
+      }
     }
   } else if (is_token("if")) {
     read_position += 2;
@@ -544,8 +549,23 @@ i32 parse_token() {
     printf("else\n");
     enter_block();
   } else if (is_token("while")) {
-    printf("while\n");
+    Jump iteration_jump = {
+      .type = jumps.iterate,
+      .index = read_position
+    };
     read_position += 5;
+    printf("while\n");
+    skip_spaces();
+    read_position += 1; // skip start parenthesis
+    if (evaluate_condition()) {
+      printf("while condition was true\n");
+      array_push(jump_stack, &iteration_jump);
+      enter_block();
+    } else {
+      printf("while condition was false\n");
+      enter_block();
+      skip_block();
+    }
   } else if (is_token("//")) {
     printf("comment\n");
     skip_line();
