@@ -13,12 +13,14 @@
 // - [x] Add if
 // - [x] Add logical condition evaluation
 // - [x] Add else
-// - [ ] Add while
-// - [ ] Add string type
+// - [x] Add while
+// - [x] Assignment of existing variable
 // - [ ] Add print statement
 // - [ ] Add function declaration
 // - [ ] Add function call
+// - [ ] Add string type
 // - [ ] Add undefined Number value
+// - [ ] Add scope to variables by block level, removing current block level variables on block end
 
 // Global variables
 u8 *file_data = 0; // File data
@@ -159,6 +161,10 @@ Number parse_get_variable() {
     iterator -= 1;
   }
   free(variable_name);
+  if (!value_found) {
+    printf("Error: Variable %s not found\n", variable_name);
+    exit(1);
+  }
   return value;
 }
 
@@ -369,6 +375,7 @@ i64 parse_set_variable() {
   }
   // Get the value
   Number value = evaluate_expression();
+  read_position += 1; // Skip the trailing ;
 
   // Push the variable to the variables array
   Variable new_variable = {
@@ -376,7 +383,62 @@ i64 parse_set_variable() {
     .name = variable_name
   };
   array_push(variables, &new_variable);
+  return success;
+}
 
+i32 get_variable_index(char *name) {
+  i32 index = array_length(variables) - 1;
+  while (index >= 0) {
+    Variable *variable = (Variable *)array_get(variables, index);
+    if (strcmp(variable->name, name) == 0) {
+      return index;
+    }
+    index -= 1;
+  }
+  return -1;
+}
+
+// Parses a variable and sets it in the variables array
+i64 parse_set_existing_variable() {
+  // Get the variable name start and length
+  u8 *name_start = &file_data[read_position];
+  i32 name_length = 0;
+  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
+    name_length += 1;
+    read_position += 1;
+  }
+
+  // Allocate memory for the variable name and copy it
+  // TODO: Use temporary memory as memory here
+  char *variable_name = arena_fill(arena, sizeof(char) * (name_length + 1));
+  if (variable_name == NULL) {
+    printf("Memory allocation failed in set_existing_variable\n");
+    return error;
+  }
+  memcpy(variable_name, name_start, name_length);
+  variable_name[name_length] = '\0'; // Null terminate the string
+  i32 existing_index = get_variable_index(variable_name);
+  if (existing_index >= 0) {
+    // Skip spaces and =
+    while (is_token(" ") || is_token("=")) {
+      read_position += 1;
+    }
+    // Get the value
+    Number value = evaluate_expression();
+    read_position += 1; // Skip the trailing ;
+
+    // Push the variable to the variables array
+    Variable new_variable = {
+      .value = value,
+      .name = variable_name
+    };
+    // Find existing variable and update it if it exists
+    array_set(variables, existing_index, &new_variable);
+    // free(variable_name);
+  } else {
+    printf("Error: Variable %s not found\n", variable_name);
+    exit(1);
+  }
   return success;
 }
 
@@ -416,13 +478,20 @@ i64 skip_line() {
 
 // Assignment or function call
 i64 handle_other() {
+  // New variable
   if (is_token("var")) {
     // printf("new variable\n");
     read_position += 3;
     // Read the variable name and value and add it to the variables array
     parse_set_variable();
-  } else {
-    // printf("Unknown token\n");
+  }
+  // Existing variable
+  else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
+    parse_set_existing_variable();
+  }
+  // Other token
+  else {
+    printf("Unknown token: %c\n", file_data[read_position]);
     read_position += 1;
   }
   return success;
@@ -509,11 +578,9 @@ i32 parse_token() {
     Jump *jump = (Jump *)array_pop(jump_stack);
     if (jump != 0) {
       if (jump->type == jumps.skip_else) {
-        // printf("skip_block: %d\n", jump->type);
         skip_spaces();
         skip_elses();
       } else if (jump->type == jumps.iterate) {
-        // printf("iterate\n");
         read_position = jump->index;
       }
     }
