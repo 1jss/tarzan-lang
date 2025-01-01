@@ -211,6 +211,7 @@ Number compact_number(Number number) {
 }
 
 // Evaluate an expression
+// Parser reads up to 3 numbers and 2 operators at a time and evaluates the operator with the highest priority first. This makes it possible to evaluate expressions like a + b * c * d + e accurately.
 Number evaluate_expression() {
   Number result = {.value = 0, .exponent = 0};
   u8 parsed_numbers = 0; // Keep track of current parser window
