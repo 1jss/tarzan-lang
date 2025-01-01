@@ -103,9 +103,9 @@ const Comparators comparators = {
   .greater_than_or_equal_to = 5
 };
 
-// Parse a number from the file data
+// Parse a number
 Number parse_number() {
-  Number number = {.value = 0, .exponent = 0};
+  Number number = {0};
   // Check if the number is negative
   bool negative = file_data[read_position] == '-';
   read_position += negative ? 1 : 0;
