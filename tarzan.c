@@ -128,7 +128,6 @@ Number parse_number() {
   return number;
 }
 
-
 i32 get_variable_index(char *name) {
   i32 index = array_length(variables) - 1;
   while (index >= 0) {
@@ -143,10 +142,10 @@ i32 get_variable_index(char *name) {
 
 // Parses out a variable name and returns that item from the variables array
 Number parse_get_variable() {
-  // printf("parse_get_variable\n");
-  i32 name_length = 0;
-  // Store a pointer to the start of the variable name
+  // DUPLICATE CODE in set_variable
+  // Get the variable name start and length
   u8 *name_start = &file_data[read_position];
+  i32 name_length = 0;
   while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
     name_length += 1;
     read_position += 1;
@@ -154,30 +153,22 @@ Number parse_get_variable() {
   // Allocate memory for the variable name and copy it
   char *variable_name = malloc(sizeof(char) * (name_length + 1));
   if (variable_name == NULL) {
-    fprintf(stderr, "Memory allocation failed\n");
+    printf("Memory allocation failed in parse_get_variable\n");
     exit(1);
   }
   memcpy(variable_name, name_start, name_length);
-  // Null terminate the string
-  variable_name[name_length] = '\0';
+  variable_name[name_length] = '\0'; // Null terminate the string
 
+  i32 variable_index = get_variable_index(variable_name);
   Number value = {.value = 0, .exponent = 0};
-  bool value_found = false;
-  i32 iterator = array_length(variables) - 1;
-  // Search for the variable in the variables array starting from the most recently added variables
-  while (iterator >= 0 && !value_found) {
-    Variable *variable = (Variable *)array_get(variables, iterator);
-    if (strcmp(variable->name, variable_name) == 0) {
-      value = variable->value;
-      value_found = true;
-    }
-    iterator -= 1;
-  }
-  free(variable_name);
-  if (!value_found) {
+  if (variable_index >= 0) {
+    Variable *variable = (Variable *)array_get(variables, variable_index);
+    value = variable->value;
+  } else {
     printf("Error: Variable %s not found\n", variable_name);
     exit(1);
   }
+  free(variable_name);
   return value;
 }
 
@@ -357,7 +348,6 @@ Number evaluate_expression() {
 
 // Parses out a variable name and a value and adds them as a new new item to the variables array
 i64 new_variable() {
-
   // Skip spaces
   while (is_token(" ")) {
     read_position += 1;
@@ -399,6 +389,7 @@ i64 new_variable() {
 
 // Parses out a variable name, finds it in the variables array and updates it with a new value
 i64 set_variable() {
+  // DUPLICATE CODE in parse_get_variable
   // Get the variable name start and length
   u8 *name_start = &file_data[read_position];
   i32 name_length = 0;
@@ -408,36 +399,38 @@ i64 set_variable() {
   }
 
   // Allocate memory for the variable name and copy it
-  // TODO: Use temporary memory as memory here
-  char *variable_name = arena_fill(arena, sizeof(char) * (name_length + 1));
+  char *variable_name = malloc(sizeof(char) * (name_length + 1));
   if (variable_name == NULL) {
     printf("Memory allocation failed in set_existing_variable\n");
     return error;
   }
   memcpy(variable_name, name_start, name_length);
   variable_name[name_length] = '\0'; // Null terminate the string
-  i32 existing_index = get_variable_index(variable_name);
-  if (existing_index >= 0) {
+
+  i32 variable_index = get_variable_index(variable_name);
+  if (variable_index >= 0) {
+    Variable *old_variable = (Variable *)array_get(variables, variable_index);
+
     // Skip spaces and =
     while (is_token(" ") || is_token("=")) {
       read_position += 1;
     }
     // Get the value
-    Number value = evaluate_expression();
+    Number new_value = evaluate_expression();
     read_position += 1; // Skip the trailing ;
 
     // Push the variable to the variables array
     Variable new_variable = {
-      .value = value,
-      .name = variable_name
+      .name = old_variable->name, // Old name is already allocated in arena
+      .value = new_value
     };
-    // Find existing variable and update it if it exists
-    array_set(variables, existing_index, &new_variable);
-    // free(variable_name);
+    // Update variable with new value
+    array_set(variables, variable_index, &new_variable);
   } else {
     printf("Error: Variable %s not found\n", variable_name);
     exit(1);
   }
+  free(variable_name);
   return success;
 }
 
