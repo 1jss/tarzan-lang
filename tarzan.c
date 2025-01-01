@@ -160,16 +160,16 @@ Number parse_get_variable() {
   variable_name[name_length] = '\0'; // Null terminate the string
 
   i32 variable_index = get_variable_index(variable_name);
-  Number value = {.value = 0, .exponent = 0};
+  Number variable_value = {0};
   if (variable_index >= 0) {
     Variable *variable = (Variable *)array_get(variables, variable_index);
-    value = variable->value;
+    variable_value = variable->value;
   } else {
     printf("Error: Variable %s not found\n", variable_name);
     exit(1);
   }
   free(variable_name);
-  return value;
+  return variable_value;
 }
 
 // Takes two numbers and aligns them at the lowest exponent
@@ -402,7 +402,7 @@ i64 set_variable() {
   char *variable_name = malloc(sizeof(char) * (name_length + 1));
   if (variable_name == NULL) {
     printf("Memory allocation failed in set_existing_variable\n");
-    return error;
+    exit(1);
   }
   memcpy(variable_name, name_start, name_length);
   variable_name[name_length] = '\0'; // Null terminate the string
