@@ -128,7 +128,20 @@ Number parse_number() {
   return number;
 }
 
-// Parses out a variable name and returns its value
+
+i32 get_variable_index(char *name) {
+  i32 index = array_length(variables) - 1;
+  while (index >= 0) {
+    Variable *variable = (Variable *)array_get(variables, index);
+    if (strcmp(variable->name, name) == 0) {
+      return index;
+    }
+    index -= 1;
+  }
+  return -1;
+}
+
+// Parses out a variable name and returns that item from the variables array
 Number parse_get_variable() {
   // printf("parse_get_variable\n");
   i32 name_length = 0;
@@ -196,6 +209,7 @@ Number divide_numbers(Number *a, Number *b) {
   return result;
 }
 
+// Compacts a number by removing trailing zeros
 Number compact_number(Number number) {
   Number result = number;
   while (result.value % 10 == 0 && result.value != 0) {
@@ -337,15 +351,12 @@ Number evaluate_expression() {
   else if (parsed_numbers == 1) {
     result = first_number;
   }
-  // Compact the result number by removing trailing zeros
   result = compact_number(result);
-  // printf("evaluate_expression result: %lld * 10^%d\n", result.value, result.exponent);
   return result;
 }
 
-// Parses a variable and sets it in the variables array
-i64 parse_set_variable() {
-  // printf("parse_set_variable\n");
+// Parses out a variable name and a value and adds them as a new new item to the variables array
+i64 new_variable() {
 
   // Skip spaces
   while (is_token(" ")) {
@@ -386,20 +397,8 @@ i64 parse_set_variable() {
   return success;
 }
 
-i32 get_variable_index(char *name) {
-  i32 index = array_length(variables) - 1;
-  while (index >= 0) {
-    Variable *variable = (Variable *)array_get(variables, index);
-    if (strcmp(variable->name, name) == 0) {
-      return index;
-    }
-    index -= 1;
-  }
-  return -1;
-}
-
-// Parses a variable and sets it in the variables array
-i64 parse_set_existing_variable() {
+// Parses out a variable name, finds it in the variables array and updates it with a new value
+i64 set_variable() {
   // Get the variable name start and length
   u8 *name_start = &file_data[read_position];
   i32 name_length = 0;
@@ -442,18 +441,17 @@ i64 parse_set_existing_variable() {
   return success;
 }
 
+// Step into the next block
 i64 enter_block() {
-  // printf("enter_block\n");
   while (!is_token("{") && read_position < file_size) {
     read_position += 1;
   }
-  // Step over the {
   read_position += 1;
   return success;
 }
 
+// Step out of the current block skipping inner blocks
 i64 skip_block() {
-  // printf("skip_block\n");
   i32 block_count = 1;
   while (block_count > 0 && read_position < file_size) {
     if (is_token("{")) {
@@ -466,34 +464,12 @@ i64 skip_block() {
   return success;
 }
 
+// Skip until the next line
 i64 skip_line() {
-  // printf("skip_line\n");
   while (!is_token("\n") && read_position < file_size) {
     read_position += 1;
   }
-  // Step over the \n
   read_position += 1;
-  return success;
-}
-
-// Assignment or function call
-i64 handle_other() {
-  // New variable
-  if (is_token("var")) {
-    // printf("new variable\n");
-    read_position += 3;
-    // Read the variable name and value and add it to the variables array
-    parse_set_variable();
-  }
-  // Existing variable
-  else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
-    parse_set_existing_variable();
-  }
-  // Other token
-  else {
-    printf("Unknown token: %c\n", file_data[read_position]);
-    read_position += 1;
-  }
   return success;
 }
 
@@ -561,20 +537,16 @@ i32 parse_token() {
   // Skip spaces
   while (is_token(" ") || is_token("\n")) {
     read_position += 1;
-    // printf("space or newline\n");
   }
   if (is_token("(")) {
-    // printf("start paren\n");
     read_position += 1;
     Number result = evaluate_expression();
     printf("result: %lld * 10^%d\n", result.value, result.exponent);
     read_position += 1;
   } else if (is_token(")")) {
     read_position += 1;
-    // printf("end paren\n");
   } else if (is_token("}")) {
     read_position += 1;
-    // printf("end block\n");
     Jump *jump = (Jump *)array_pop(jump_stack);
     if (jump != 0) {
       if (jump->type == jumps.skip_else) {
@@ -600,7 +572,6 @@ i32 parse_token() {
     }
   } else if (is_token("else if")) {
     read_position += 7;
-    // printf("else if statement\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
@@ -614,7 +585,6 @@ i32 parse_token() {
     }
   } else if (is_token("else")) {
     read_position += 4;
-    // printf("else\n");
     enter_block();
   } else if (is_token("while")) {
     Jump iteration_jump = {
@@ -622,23 +592,34 @@ i32 parse_token() {
       .index = read_position
     };
     read_position += 5;
-    // printf("while\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      // printf("while condition was true\n");
       array_push(jump_stack, &iteration_jump);
       enter_block();
     } else {
-      // printf("while condition was false\n");
       enter_block();
       skip_block();
     }
-  } else if (is_token("//")) {
-    // printf("comment\n");
+  }
+  // Comment
+  else if (is_token("//")) {
     skip_line();
-  } else {
-    handle_other();
+  }
+  // New variable
+  else if (is_token("var")) {
+    read_position += 3;
+    // Read the variable name and value and add it to the variables array
+    new_variable();
+  }
+  // Existing variable
+  else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
+    set_variable();
+  }
+  // Other token
+  else {
+    printf("Unknown token: %c\n", file_data[read_position]);
+    read_position += 1;
   }
   return success;
 }
@@ -663,6 +644,7 @@ i32 main(i32 arg_count, char *arguments[]) {
   file_data = (u8 *)arena_fill(arena, file_size);
   fread(file_data, 1, file_size, file);
 
+  // Initialize variables and jump stack arrays
   variables = array_create(arena, sizeof(Variable));
   jump_stack = array_create(arena, sizeof(Jump));
 
