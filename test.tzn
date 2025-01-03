@@ -4,7 +4,9 @@ while (i < 5) {
   var j = 0;
   while (j < 5) {
     j = j + 1;
-    (i * j)
+    if (i * j > 3){
+      (i * j)
+    }
   }
 }
 

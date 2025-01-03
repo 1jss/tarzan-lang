@@ -20,7 +20,7 @@
 // - [ ] Add function call
 // - [ ] Add string type
 // - [ ] Add undefined Number value
-// - [ ] Add scope to variables by block level, removing current block level variables on block end
+// - [x] Add scope to variables by block level, removing current block level variables on block end
 
 // Global variables
 u8 *file_data = 0; // File data
@@ -29,6 +29,7 @@ Arena *arena = 0; // Arena for memory allocation
 Array *variables = 0; // Variables
 i64 read_position = 0;
 Array *jump_stack = 0; // Jump stack determines what happens when a block ends
+i32 block_level = 0; // Current block level used for variable scope
 
 const i32 success = 0;
 const i32 error = 1;
@@ -71,6 +72,7 @@ typedef struct {
 typedef struct {
   Number value;
   char *name;
+  i32 level;
 } Variable;
 
 typedef struct {
@@ -128,6 +130,21 @@ Number parse_number() {
   return number;
 }
 
+// Prune the variables array by removing all variables at the current block level and then decrease the block level
+// TODO: Doesn't need to iterate the whole array, just pop until the level is lower
+void decrese_block_level() {
+  i32 index = array_last(variables);
+  while (index >= 0) {
+    Variable *variable = (Variable *)array_get(variables, index);
+    if (variable->level == block_level) {
+      array_pop(variables);
+    }
+    index -= 1;
+  }
+  block_level -= 1;
+}
+
+// Get the index of a variable by name
 i32 get_variable_index(char *name) {
   i32 index = array_length(variables) - 1;
   while (index >= 0) {
@@ -382,7 +399,8 @@ i64 new_variable() {
   // Push the variable to the variables array
   Variable new_variable = {
     .value = value,
-    .name = variable_name
+    .name = variable_name,
+    .level = block_level
   };
   array_push(variables, &new_variable);
   return success;
@@ -423,7 +441,8 @@ i64 set_variable() {
     // Push the variable to the variables array
     Variable new_variable = {
       .name = old_variable->name, // Old name is already allocated in arena
-      .value = new_value
+      .value = new_value,
+      .level = old_variable->level
     };
     // Update variable with new value
     array_set(variables, variable_index, &new_variable);
@@ -543,6 +562,7 @@ i32 parse_token() {
     read_position += 1;
     Jump *jump = (Jump *)array_pop(jump_stack);
     if (jump != 0) {
+      decrese_block_level();
       if (jump->type == jumps.skip_else) {
         skip_spaces();
         skip_elses();
@@ -559,6 +579,7 @@ i32 parse_token() {
       // printf("if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
+      block_level += 1;
     } else {
       // printf("if statement was false\n");
       enter_block();
@@ -572,6 +593,7 @@ i32 parse_token() {
       // printf("else if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
+      block_level += 1;
     } else {
       // printf("else if statement was false\n");
       enter_block();
@@ -580,6 +602,7 @@ i32 parse_token() {
   } else if (is_token("else")) {
     read_position += 4;
     enter_block();
+    block_level += 1;
   } else if (is_token("while")) {
     Jump iteration_jump = {
       .type = jumps.iterate,
@@ -591,6 +614,7 @@ i32 parse_token() {
     if (evaluate_condition()) {
       array_push(jump_stack, &iteration_jump);
       enter_block();
+      block_level += 1;
     } else {
       enter_block();
       skip_block();
