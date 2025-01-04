@@ -16,7 +16,7 @@
 // - [x] Add else
 // - [x] Add while
 // - [x] Assignment of existing variable
-// - [ ] Add print statement
+// - [x] Add print statement
 // - [ ] Add function declaration
 // - [ ] Add function call
 // - [ ] Add string type
@@ -552,14 +552,7 @@ i32 parse_token() {
   while (is_token(" ") || is_token("\n")) {
     read_position += 1;
   }
-  if (is_token("(")) {
-    read_position += 1;
-    Number result = evaluate_expression();
-    printf("result: %lld * 10^%d\n", result.value, result.exponent);
-    read_position += 1;
-  } else if (is_token(")")) {
-    read_position += 1;
-  } else if (is_token("}")) {
+  if (is_token("}")) {
     read_position += 1;
     Jump *jump = (Jump *)array_pop(jump_stack);
     if (jump != 0) {
@@ -631,6 +624,13 @@ i32 parse_token() {
     // Read the variable name and value and add it to the variables array
     new_variable();
   }
+  // Print statement
+  else if (is_token("print")) {
+    read_position += 6;
+    Number result = evaluate_expression();
+    printf("%lld * 10^%d\n", result.value, result.exponent);
+    skip_line();
+  }
   // Existing variable
   else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
     set_variable();
@@ -672,10 +672,9 @@ i32 main(i32 arg_count, char *arguments[]) {
   while (read_position < file_size) {
     parse_token();
   }
-  printf("Tarzan done!\n");
   arena_close(arena);
   fclose(file);
   i32 time_end = clock();
-  printf("It took: %d ms\n", (time_end - time_start) / (CLOCKS_PER_SEC / 1000));
+  printf("Tarzan done in %dms!\n", (time_end - time_start) / (CLOCKS_PER_SEC / 1000));
   return 0;
 }
