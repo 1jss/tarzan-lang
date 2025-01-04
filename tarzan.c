@@ -3,6 +3,7 @@
 #include <stdio.h> // printf, fprintf, putchar, FILE, fgetc, EOF
 #include <stdlib.h> // fopen, fclose
 #include <string.h> // strlen, strcmp, memcpy
+#include <time.h> // clock, CLOCKS_PER_SEC
 #include "include/arena.h" // arena
 #include "include/array.h" // array
 #include "include/types.h" // i32
@@ -654,6 +655,7 @@ i32 main(i32 arg_count, char *arguments[]) {
     return 1;
   }
 
+  i32 time_start = clock();
   // Copy the file into memory
   fseek(file, 0, SEEK_END);
   file_size = ftell(file);
@@ -673,5 +675,7 @@ i32 main(i32 arg_count, char *arguments[]) {
   printf("Tarzan done!\n");
   arena_close(arena);
   fclose(file);
+  i32 time_end = clock();
+  printf("It took: %d ms\n", (time_end - time_start) / (CLOCKS_PER_SEC / 1000));
   return 0;
 }

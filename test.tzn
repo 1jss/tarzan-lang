@@ -1,8 +1,8 @@
 var i = 0;
-while (i < 5) {
+while (i < 500) {
   i = i + 1;
   var j = 0;
-  while (j < 5) {
+  while (j < 500) {
     j = j + 1;
     if (i * j > 3){
       (i * j)
