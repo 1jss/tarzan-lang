@@ -43,13 +43,13 @@ bool is_token(const char *token) {
 
 typedef struct {
   u8 skip_else; // if-else blocks
-  u8 iterate; // while blocks
+  u8 return_to; // while blocks and function calls
 } JumpTypes;
 
 // Block ends for different block types
 const JumpTypes jumps = {
   .skip_else = 1,
-  .iterate = 2,
+  .return_to = 2,
 };
 
 // Block types for the block stack
@@ -560,7 +560,7 @@ i32 parse_token() {
       if (jump->type == jumps.skip_else) {
         skip_spaces();
         skip_elses();
-      } else if (jump->type == jumps.iterate) {
+      } else if (jump->type == jumps.return_to) {
         read_position = jump->index;
       }
     }
@@ -599,7 +599,7 @@ i32 parse_token() {
     block_level += 1;
   } else if (is_token("while")) {
     Jump iteration_jump = {
-      .type = jumps.iterate,
+      .type = jumps.return_to,
       .index = read_position
     };
     read_position += 5;

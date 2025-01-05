@@ -21,7 +21,7 @@ print(sum);
 // Perform a large number of simple operations
 var simple_sum = 0;
 i = 0;
-while (i< count * 10){
+while (i < count * 10){
   simple_sum = simple_sum + i;
   i = i + 1;
 }
