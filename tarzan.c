@@ -17,8 +17,8 @@
 // - [x] Add while
 // - [x] Assignment of existing variable
 // - [x] Add print statement
-// - [ ] Add function declaration
-// - [ ] Add function call
+// - [x] Add snippet declaration
+// - [x] Add insert snippet
 // - [ ] Add string type
 // - [ ] Add undefined Number value
 // - [x] Add scope to variables by block level, removing current block level variables on block end
@@ -28,6 +28,7 @@ u8 *file_data = 0; // File data
 i64 file_size = 0; // File size
 Arena *arena = 0; // Arena for memory allocation
 Array *variables = 0; // Variables
+Array *snippets = 0; // Snippets
 i64 read_position = 0;
 Array *jump_stack = 0; // Jump stack determines what happens when a block ends
 i32 block_level = 0; // Current block level used for variable scope
@@ -75,6 +76,12 @@ typedef struct {
   char *name;
   i32 level;
 } Variable;
+
+// Snippet struct
+typedef struct {
+  char *name;
+  i64 index;
+} Snippet;
 
 typedef struct {
   u8 plus;
@@ -227,6 +234,57 @@ Number parse_get_variable() {
   }
   free(variable_name);
   return variable_value;
+}
+
+// Get the index of a snippet by name
+i64 get_snippet_index(char *name) {
+  i32 index = array_length(snippets) - 1;
+  while (index >= 0) {
+    Snippet *snippet = (Snippet *)array_get(snippets, index);
+    if (strcmp(snippet->name, name) == 0) {
+      return snippet->index;
+    }
+    index -= 1;
+  }
+  return -1;
+}
+
+// Parses out a snippet name and sets that item's index from the snippets array
+void parse_get_snippet() {
+  // DUPLICATE CODE in set_variable
+  // Get the snippet name start and length
+  u8 *name_start = &file_data[read_position];
+  i32 name_length = 0;
+  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
+    name_length += 1;
+    read_position += 1;
+  }
+  // Allocate memory for the variable name and copy it
+  char *snippet_name = malloc(sizeof(char) * (name_length + 1));
+  if (snippet_name == NULL) {
+    printf("Memory allocation failed in parse_get_snippet\n");
+    exit(1);
+  }
+  memcpy(snippet_name, name_start, name_length);
+  snippet_name[name_length] = '\0'; // Null terminate the string
+
+  i64 snippet_index = get_snippet_index(snippet_name);
+  if (snippet_index == -1) {
+    printf("Error: Snippet %s not found\n", snippet_name);
+    exit(1);
+  }
+
+  // Put end of the line on the jump stack so the parser knows where to continue after the snippet
+  skip_line();
+  Jump return_jump = {
+    .type = jumps.return_to,
+    .index = read_position
+  };
+  array_push(jump_stack, &return_jump);
+  read_position = snippet_index;
+  block_level += 1;
+
+  free(snippet_name);
 }
 
 // Takes two numbers and aligns them at the lowest exponent
@@ -446,6 +504,38 @@ i64 new_variable() {
   return success;
 }
 
+// Parses out a snippet name and adds it to the snippets array
+i64 new_snippet() {
+  skip_spaces();
+
+  // Get the variable name start and length
+  u8 *name_start = &file_data[read_position];
+  i32 name_length = 0;
+  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
+    name_length += 1;
+    read_position += 1;
+  }
+
+  // Allocate memory for the snippet name and copy it
+  char *snippet_name = arena_fill(arena, sizeof(char) * (name_length + 1));
+  if (snippet_name == NULL) {
+    printf("Memory allocation failed in new_snippet\n");
+    return error;
+  }
+  memcpy(snippet_name, name_start, name_length);
+  snippet_name[name_length] = '\0'; // Null terminate the string
+
+  enter_block();
+  // Push the snippet to the snippets array
+  Snippet new_snippet = {
+    .name = snippet_name,
+    .index = read_position
+  };
+  array_push(snippets, &new_snippet);
+  skip_block();
+  return success;
+}
+
 // Parses out a variable name, finds it in the variables array and updates it with a new value
 i64 set_variable() {
   // DUPLICATE CODE in parse_get_variable
@@ -626,6 +716,18 @@ i32 parse_token() {
     // Read the variable name and value and add it to the variables array
     new_variable();
   }
+  // New snippet
+  else if (is_token("snip")) {
+    read_position += 4;
+    // Read the snippet name and value and add it to the snippets array
+    new_snippet();
+  }
+  // Insert snippet
+  else if(is_token("ins")) {
+    read_position += 3;
+    skip_spaces();
+    parse_get_snippet();
+  }
   // Print statement
   else if (is_token("print")) {
     read_position += 6;
@@ -668,6 +770,7 @@ i32 main(i32 arg_count, char *arguments[]) {
 
   // Initialize variables and jump stack arrays
   variables = array_create(arena, sizeof(Variable));
+  snippets = array_create(arena, sizeof(Snippet));
   jump_stack = array_create(arena, sizeof(Jump));
 
   // Parse the file

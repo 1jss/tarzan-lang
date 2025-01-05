@@ -1,8 +1,12 @@
 // Test program to measure the speed of the interpreter
 
+snip i_plus = {
+  i = i + 1;
+}
+
 // Initialize variables
 var sum = 0;
-var count = 1000;
+var count = 10;
 
 // Perform a large number of arithmetic operations
 var i = 0;
@@ -12,7 +16,7 @@ while (i < count) {
     sum = sum + (i * j) - (i + j);
     j = j + 1;
   }
-  i = i + 1;
+  ins i_plus;
 }
 
 // Print the result of the arithmetic operations
@@ -23,7 +27,7 @@ var simple_sum = 0;
 i = 0;
 while (i < count * 10){
   simple_sum = simple_sum + i;
-  i = i + 1;
+  ins i_plus;
 }
 
 // Print the result of the simple operations
