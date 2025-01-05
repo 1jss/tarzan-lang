@@ -204,8 +204,8 @@ i32 get_variable_index(char *name) {
   return -1;
 }
 
-// Parses out a variable name and saves it in the arena
-char *parse_name(){
+// Parses out a variable name and saves it either in the arena or on the heap
+char *parse_name(bool save){
   skip_spaces();
   u8 *name_start = &file_data[read_position];
   i32 name_length = 0;
@@ -214,28 +214,12 @@ char *parse_name(){
     read_position += 1;
   }
   // Allocate memory for the variable name and copy it
-  char *variable_name = malloc(sizeof(char) * (name_length + 1));
-  if (variable_name == NULL) {
-    printf("Memory allocation failed in parse_get_variable\n");
-    exit(1);
+  char *variable_name = 0;
+  if (save) {
+    variable_name = arena_fill(arena, sizeof(char) * (name_length + 1));
+  } else {
+    variable_name = malloc(sizeof(char) * (name_length + 1));
   }
-  memcpy(variable_name, name_start, name_length);
-  variable_name[name_length] = '\0'; // Null terminate the string
-  return variable_name;
-}
-
-// Parses out a name and allocates temporary memory for it
-// !! Needs to be freed manually after use.
-char *parse_name_temp(){
-  skip_spaces();
-  u8 *name_start = &file_data[read_position];
-  i32 name_length = 0;
-  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
-    name_length += 1;
-    read_position += 1;
-  }
-  // Allocate memory for the variable name and copy it
-  char *variable_name = malloc(sizeof(char) * (name_length + 1));
   if (variable_name == NULL) {
     printf("Memory allocation failed in parse_get_variable\n");
     exit(1);
@@ -247,7 +231,7 @@ char *parse_name_temp(){
 
 // Parses out a variable name and returns that item from the variables array
 Number parse_get_variable() {
-  char *variable_name = parse_name_temp();
+  char *variable_name = parse_name(false);
   i32 variable_index = get_variable_index(variable_name);
   Number variable_value = {0};
   if (variable_index >= 0) {
@@ -276,7 +260,7 @@ i64 get_snippet_index(char *name) {
 
 // Parses out a snippet name and sets that item's index from the snippets array
 void parse_get_snippet() {
-  char *snippet_name = parse_name_temp();
+  char *snippet_name = parse_name(false);
   i64 snippet_index = get_snippet_index(snippet_name);
   if (snippet_index == -1) {
     printf("Error: Snippet %s not found\n", snippet_name);
@@ -470,7 +454,7 @@ Number evaluate_expression() {
 
 // Parses out a variable name and a value and adds them as a new new item to the variables array
 i64 new_variable() {
-  char *variable_name = parse_name();
+  char *variable_name = parse_name(true);
   // Skip spaces and =
   while (is_token(" ") || is_token("=")) {
     read_position += 1;
@@ -491,7 +475,7 @@ i64 new_variable() {
 
 // Parses out a snippet name and adds it to the snippets array
 i64 new_snippet() {
-  char *snippet_name = parse_name();
+  char *snippet_name = parse_name(true);
   enter_block();
   // Push the snippet to the snippets array
   Snippet new_snippet = {
@@ -506,7 +490,7 @@ i64 new_snippet() {
 
 // Parses out a variable name, finds it in the variables array and updates it with a new value
 i64 set_variable() {
-  char *variable_name = parse_name_temp();
+  char *variable_name = parse_name(false);
   i32 variable_index = get_variable_index(variable_name);
   if (variable_index >= 0) {
     Variable *variable_ref = (Variable *)array_get(variables, variable_index);
