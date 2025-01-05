@@ -131,6 +131,45 @@ Number parse_number() {
   return number;
 }
 
+
+// Step into the next block
+i64 enter_block() {
+  while (!is_token("{") && read_position < file_size) {
+    read_position += 1;
+  }
+  read_position += 1;
+  return success;
+}
+
+// Step out of the current block skipping inner blocks
+i64 skip_block() {
+  i32 block_count = 1;
+  while (block_count > 0 && read_position < file_size) {
+    if (is_token("{")) {
+      block_count += 1;
+    } else if (is_token("}")) {
+      block_count -= 1;
+    }
+    read_position += 1;
+  }
+  return success;
+}
+
+// Skip until the next line
+i64 skip_line() {
+  while (!is_token("\n") && read_position < file_size) {
+    read_position += 1;
+  }
+  read_position += 1;
+  return success;
+}
+
+void skip_spaces() {
+  while (is_token(" ") && read_position < file_size) {
+    read_position += 1;
+  }
+}
+
 // Prune the variables array by removing all variables at the current block level and then decrease the block level
 // TODO: Doesn't need to iterate the whole array, just pop until the level is lower
 void decrese_block_level() {
@@ -383,7 +422,7 @@ i64 new_variable() {
   // Allocate memory for the variable name and copy it
   char *variable_name = arena_fill(arena, sizeof(char) * (name_length + 1));
   if (variable_name == NULL) {
-    printf("Memory allocation failed in set_variable\n");
+    printf("Memory allocation failed in new_variable\n");
     return error;
   }
   memcpy(variable_name, name_start, name_length);
@@ -455,43 +494,6 @@ i64 set_variable() {
   return success;
 }
 
-// Step into the next block
-i64 enter_block() {
-  while (!is_token("{") && read_position < file_size) {
-    read_position += 1;
-  }
-  read_position += 1;
-  return success;
-}
-
-// Step out of the current block skipping inner blocks
-i64 skip_block() {
-  i32 block_count = 1;
-  while (block_count > 0 && read_position < file_size) {
-    if (is_token("{")) {
-      block_count += 1;
-    } else if (is_token("}")) {
-      block_count -= 1;
-    }
-    read_position += 1;
-  }
-  return success;
-}
-
-// Skip until the next line
-i64 skip_line() {
-  while (!is_token("\n") && read_position < file_size) {
-    read_position += 1;
-  }
-  read_position += 1;
-  return success;
-}
-
-void skip_spaces() {
-  while (is_token(" ") && read_position < file_size) {
-    read_position += 1;
-  }
-}
 
 // Skips following else blocks after an if or else if block
 void skip_elses() {
