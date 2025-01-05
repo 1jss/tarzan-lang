@@ -1,6 +1,6 @@
 #include <math.h> // pow
 #include <stdbool.h> // bool
-#include <stdio.h> // printf, fprintf, putchar, FILE, fgetc, EOF
+#include <stdio.h> // printf, FILE
 #include <stdlib.h> // fopen, fclose
 #include <string.h> // strlen, strcmp, memcpy
 #include <time.h> // clock, CLOCKS_PER_SEC
@@ -204,10 +204,9 @@ i32 get_variable_index(char *name) {
   return -1;
 }
 
-// Parses out a variable name and returns that item from the variables array
-Number parse_get_variable() {
-  // DUPLICATE CODE in set_variable
-  // Get the variable name start and length
+// Parses out a variable name and saves it in the arena
+char *parse_name(){
+  skip_spaces();
   u8 *name_start = &file_data[read_position];
   i32 name_length = 0;
   while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
@@ -222,7 +221,33 @@ Number parse_get_variable() {
   }
   memcpy(variable_name, name_start, name_length);
   variable_name[name_length] = '\0'; // Null terminate the string
+  return variable_name;
+}
 
+// Parses out a name and allocates temporary memory for it
+// !! Needs to be freed manually after use.
+char *parse_name_temp(){
+  skip_spaces();
+  u8 *name_start = &file_data[read_position];
+  i32 name_length = 0;
+  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
+    name_length += 1;
+    read_position += 1;
+  }
+  // Allocate memory for the variable name and copy it
+  char *variable_name = malloc(sizeof(char) * (name_length + 1));
+  if (variable_name == NULL) {
+    printf("Memory allocation failed in parse_get_variable\n");
+    exit(1);
+  }
+  memcpy(variable_name, name_start, name_length);
+  variable_name[name_length] = '\0'; // Null terminate the string
+  return variable_name;
+}
+
+// Parses out a variable name and returns that item from the variables array
+Number parse_get_variable() {
+  char *variable_name = parse_name_temp();
   i32 variable_index = get_variable_index(variable_name);
   Number variable_value = {0};
   if (variable_index >= 0) {
@@ -251,29 +276,12 @@ i64 get_snippet_index(char *name) {
 
 // Parses out a snippet name and sets that item's index from the snippets array
 void parse_get_snippet() {
-  // DUPLICATE CODE in set_variable
-  // Get the snippet name start and length
-  u8 *name_start = &file_data[read_position];
-  i32 name_length = 0;
-  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
-    name_length += 1;
-    read_position += 1;
-  }
-  // Allocate memory for the variable name and copy it
-  char *snippet_name = malloc(sizeof(char) * (name_length + 1));
-  if (snippet_name == NULL) {
-    printf("Memory allocation failed in parse_get_snippet\n");
-    exit(1);
-  }
-  memcpy(snippet_name, name_start, name_length);
-  snippet_name[name_length] = '\0'; // Null terminate the string
-
+  char *snippet_name = parse_name_temp();
   i64 snippet_index = get_snippet_index(snippet_name);
   if (snippet_index == -1) {
     printf("Error: Snippet %s not found\n", snippet_name);
     exit(1);
   }
-
   // Put end of the line on the jump stack so the parser knows where to continue after the snippet
   skip_line();
   Jump return_jump = {
@@ -281,9 +289,9 @@ void parse_get_snippet() {
     .index = read_position
   };
   array_push(jump_stack, &return_jump);
+  // Set the read position to the snippet start
   read_position = snippet_index;
   block_level += 1;
-
   free(snippet_name);
 }
 
@@ -371,7 +379,6 @@ Number evaluate_expression() {
     }
     // if variable name
     else if (file_data[read_position] >= 'a' && file_data[read_position] <= 'z') {
-      // printf("found variable\n");
       Number variable = parse_get_variable();
       if (parsed_numbers == 0) {
         first_number = variable;
@@ -386,7 +393,6 @@ Number evaluate_expression() {
     }
     // if new block
     else if (is_token("(")) {
-      // printf("found (\n");
       read_position += 1;
       Number block_result = evaluate_expression();
       read_position += 1;
@@ -464,28 +470,7 @@ Number evaluate_expression() {
 
 // Parses out a variable name and a value and adds them as a new new item to the variables array
 i64 new_variable() {
-  // Skip spaces
-  while (is_token(" ")) {
-    read_position += 1;
-  }
-
-  // Get the variable name start and length
-  u8 *name_start = &file_data[read_position];
-  i32 name_length = 0;
-  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
-    name_length += 1;
-    read_position += 1;
-  }
-
-  // Allocate memory for the variable name and copy it
-  char *variable_name = arena_fill(arena, sizeof(char) * (name_length + 1));
-  if (variable_name == NULL) {
-    printf("Memory allocation failed in new_variable\n");
-    return error;
-  }
-  memcpy(variable_name, name_start, name_length);
-  variable_name[name_length] = '\0'; // Null terminate the string
-
+  char *variable_name = parse_name();
   // Skip spaces and =
   while (is_token(" ") || is_token("=")) {
     read_position += 1;
@@ -506,25 +491,7 @@ i64 new_variable() {
 
 // Parses out a snippet name and adds it to the snippets array
 i64 new_snippet() {
-  skip_spaces();
-
-  // Get the variable name start and length
-  u8 *name_start = &file_data[read_position];
-  i32 name_length = 0;
-  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
-    name_length += 1;
-    read_position += 1;
-  }
-
-  // Allocate memory for the snippet name and copy it
-  char *snippet_name = arena_fill(arena, sizeof(char) * (name_length + 1));
-  if (snippet_name == NULL) {
-    printf("Memory allocation failed in new_snippet\n");
-    return error;
-  }
-  memcpy(snippet_name, name_start, name_length);
-  snippet_name[name_length] = '\0'; // Null terminate the string
-
+  char *snippet_name = parse_name();
   enter_block();
   // Push the snippet to the snippets array
   Snippet new_snippet = {
@@ -532,33 +499,17 @@ i64 new_snippet() {
     .index = read_position
   };
   array_push(snippets, &new_snippet);
+  // Snippet should not be evaluated before it's inserted
   skip_block();
   return success;
 }
 
 // Parses out a variable name, finds it in the variables array and updates it with a new value
 i64 set_variable() {
-  // DUPLICATE CODE in parse_get_variable
-  // Get the variable name start and length
-  u8 *name_start = &file_data[read_position];
-  i32 name_length = 0;
-  while ((file_data[read_position] >= 'a' && file_data[read_position] <= 'z') || file_data[read_position] == '_') {
-    name_length += 1;
-    read_position += 1;
-  }
-
-  // Allocate memory for the variable name and copy it
-  char *variable_name = malloc(sizeof(char) * (name_length + 1));
-  if (variable_name == NULL) {
-    printf("Memory allocation failed in set_existing_variable\n");
-    exit(1);
-  }
-  memcpy(variable_name, name_start, name_length);
-  variable_name[name_length] = '\0'; // Null terminate the string
-
+  char *variable_name = parse_name_temp();
   i32 variable_index = get_variable_index(variable_name);
   if (variable_index >= 0) {
-    Variable *old_variable = (Variable *)array_get(variables, variable_index);
+    Variable *variable_ref = (Variable *)array_get(variables, variable_index);
 
     // Skip spaces and =
     while (is_token(" ") || is_token("=")) {
@@ -567,15 +518,7 @@ i64 set_variable() {
     // Get the value
     Number new_value = evaluate_expression();
     read_position += 1; // Skip the trailing ;
-
-    // Push the variable to the variables array
-    Variable new_variable = {
-      .name = old_variable->name, // Old name is already allocated in arena
-      .value = new_value,
-      .level = old_variable->level
-    };
-    // Update variable with new value
-    array_set(variables, variable_index, &new_variable);
+    variable_ref->value = new_value;
   } else {
     printf("Error: Variable %s not found\n", variable_name);
     exit(1);
@@ -587,7 +530,6 @@ i64 set_variable() {
 
 // Skips following else blocks after an if or else if block
 void skip_elses() {
-  // printf("skip_elses\n");
   while (is_token("else") && read_position < file_size) {
     read_position += 4;
     enter_block();
@@ -597,7 +539,6 @@ void skip_elses() {
 }
 
 bool evaluate_condition() {
-  // printf("evaluate_condition\n");
   Number first_number = evaluate_expression();
   skip_spaces();
   // Get the operator
@@ -658,16 +599,13 @@ i32 parse_token() {
     }
   } else if (is_token("if")) {
     read_position += 2;
-    // printf("if statement\n");
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      // printf("if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
       block_level += 1;
     } else {
-      // printf("if statement was false\n");
       enter_block();
       skip_block();
     }
@@ -676,12 +614,10 @@ i32 parse_token() {
     skip_spaces();
     read_position += 1; // skip start parenthesis
     if (evaluate_condition()) {
-      // printf("else if statement was true\n");
       array_push(jump_stack, &skip_else_jump);
       enter_block();
       block_level += 1;
     } else {
-      // printf("else if statement was false\n");
       enter_block();
       skip_block();
     }
@@ -713,19 +649,16 @@ i32 parse_token() {
   // New variable
   else if (is_token("var")) {
     read_position += 3;
-    // Read the variable name and value and add it to the variables array
     new_variable();
   }
   // New snippet
   else if (is_token("snip")) {
     read_position += 4;
-    // Read the snippet name and value and add it to the snippets array
     new_snippet();
   }
   // Insert snippet
   else if(is_token("ins")) {
     read_position += 3;
-    skip_spaces();
     parse_get_snippet();
   }
   // Print statement
@@ -749,13 +682,13 @@ i32 parse_token() {
 
 i32 main(i32 arg_count, char *arguments[]) {
   if (arg_count != 2) {
-    fprintf(stderr, "Tarzan wants: %s <filename>\n", arguments[0]);
+    printf("Tarzan wants: %s <filename>\n", arguments[0]);
     return 1;
   }
 
   FILE *file = fopen(arguments[1], "r");
   if (file == NULL) {
-    fprintf(stderr, "Tarzan can't open file %s\n", arguments[1]);
+    printf("Tarzan can't open file %s\n", arguments[1]);
     return 1;
   }
 
