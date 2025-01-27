@@ -6,7 +6,7 @@ snip i_plus = {
 
 // Initialize variables
 var sum = 0;
-var count = 100;
+var count = 1000;
 
 // Perform a large number of arithmetic operations
 var i = 0;

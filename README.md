@@ -4,7 +4,7 @@ Tarzan is a tiny interpreted language with C-like syntax. The interpreter is a s
 
 Compiling:
 ```
-clang -std=c99 -Wall -Wextra tarzan.c -o tarzan
+clang -std=c99 -Wall -Wextra -O2 tarzan.c -o tarzan
 ```
 
 Running:
