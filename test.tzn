@@ -5,13 +5,13 @@ snip i_plus = {
 }
 
 // Initialize variables
-var sum = 0;
-var count = 1000;
+num sum = 0;
+num count = 1000;
 
 // Perform a large number of arithmetic operations
-var i = 0;
+num i = 0;
 while (i < count) {
-  var j = 0;
+  num j = 0;
   while (j < count) {
     sum = sum + (i * j) - (i + j);
     j = j + 1;
@@ -23,7 +23,7 @@ while (i < count) {
 print(sum);
 
 // Perform a large number of simple operations
-var simple_sum = 0;
+num simple_sum = 0;
 i = 0;
 while (i < count * 10){
   simple_sum = simple_sum + i;
@@ -33,11 +33,11 @@ while (i < count * 10){
 // Print the result of the simple operations
 print(simple_sum);
 
-// var frac = 100 / 3;
-// var hundred = frac * 3;
+// num frac = 100 / 3;
+// num hundred = frac * 3;
 // print(0.02 + 0.003);
-// var first_var = 83 * 100 + 83;
-// var second_var = first_var - 8382;
+// num first_var = 83 * 100 + 83;
+// num second_var = first_var - 8382;
 // print(2 * (first_var + 2727 + second_var) + 3);
 // 
 // if (100 <= 200){

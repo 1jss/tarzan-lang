@@ -631,7 +631,7 @@ i32 parse_token() {
     skip_line();
   }
   // New variable
-  else if (is_token("var")) {
+  else if (is_token("num")) {
     read_position += 3;
     new_variable();
   }
