@@ -4,9 +4,9 @@
 #include <stdlib.h> // fopen, fclose
 #include <string.h> // strlen, strcmp, memcpy
 #include <time.h> // clock, CLOCKS_PER_SEC
-#include "include/arena.h" // arena
-#include "include/array.h" // array
-#include "include/types.h" // i32
+#include "include/types.c" // i32
+#include "include/arena.c" // arena
+#include "include/array.c" // array
 
 // Tarzan is a tiny interpreted language with C-like syntax. This file includes a simple line-by-line interpreter.
 
