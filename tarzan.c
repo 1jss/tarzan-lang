@@ -179,13 +179,15 @@ void skip_spaces() {
 }
 
 // Prune the variables array by removing all variables at the current block level and then decrease the block level
-// TODO: Doesn't need to iterate the whole array, just pop until the level is lower
 void decrese_block_level() {
   i32 index = array_last(variables);
-  while (index >= 0) {
+  bool same_level = true;
+  while (index >= 0 && same_level) {
     Variable *variable = (Variable *)array_get(variables, index);
     if (variable->level == block_level) {
       array_pop(variables);
+    } else {
+      same_level = false;
     }
     index -= 1;
   }
