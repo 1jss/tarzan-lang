@@ -4,6 +4,7 @@
 #include <stdlib.h> // fopen, fclose
 #include <string.h> // strlen, strcmp, memcpy
 #include <time.h> // clock, CLOCKS_PER_SEC
+
 #include "include/types.c" // i32
 #include "include/arena.c" // arena
 #include "include/array.c" // array
@@ -581,6 +582,22 @@ i32 parse_token() {
         read_position = jump->index;
       }
     }
+  } else if (is_token("while")) {
+    Jump iteration_jump = {
+      .type = jumps.return_to,
+      .index = read_position
+    };
+    read_position += 5;
+    skip_spaces();
+    read_position += 1; // skip start parenthesis
+    if (evaluate_condition()) {
+      array_push(jump_stack, &iteration_jump);
+      enter_block();
+      block_level += 1;
+    } else {
+      enter_block();
+      skip_block();
+    }
   } else if (is_token("if")) {
     read_position += 2;
     skip_spaces();
@@ -609,41 +626,25 @@ i32 parse_token() {
     read_position += 4;
     enter_block();
     block_level += 1;
-  } else if (is_token("while")) {
-    Jump iteration_jump = {
-      .type = jumps.return_to,
-      .index = read_position
-    };
-    read_position += 5;
-    skip_spaces();
-    read_position += 1; // skip start parenthesis
-    if (evaluate_condition()) {
-      array_push(jump_stack, &iteration_jump);
-      enter_block();
-      block_level += 1;
-    } else {
-      enter_block();
-      skip_block();
-    }
-  }
-  // Comment
-  else if (is_token("//")) {
-    skip_line();
   }
   // New variable
   else if (is_token("num")) {
     read_position += 3;
     new_variable();
   }
-  // New snippet
-  else if (is_token("snip")) {
-    read_position += 4;
-    new_snippet();
-  }
   // Insert snippet
-  else if(is_token("ins")) {
+  else if(is_token("use")) {
     read_position += 3;
     parse_get_snippet();
+  }
+  // New snippet
+  else if (is_token("def")) {
+    read_position += 3;
+    new_snippet();
+  }
+  // Comment
+  else if (is_token("//")) {
+    skip_line();
   }
   // Print statement
   else if (is_token("print")) {

@@ -1,6 +1,6 @@
 // Test program to measure the speed of the interpreter
 
-snip i_plus = {
+def i_plus = {
   i = i + 1;
 }
 
@@ -16,7 +16,7 @@ while (i < count) {
     sum = sum + (i * j) - (i + j);
     j = j + 1;
   }
-  ins i_plus;
+  use i_plus;
 }
 
 // Print the result of the arithmetic operations
@@ -27,7 +27,7 @@ num simple_sum = 0;
 i = 0;
 while (i < count * 10){
   simple_sum = simple_sum + i;
-  ins i_plus;
+  use i_plus;
 }
 
 // Print the result of the simple operations

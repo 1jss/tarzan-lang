@@ -4,7 +4,7 @@
 
 /*
 
-This header defines a set of standard types. The type names are similar to those of Rust and Zig.
+C9 types defines a set of standard int and float types. The type names are similar to those of Rust and Zig.
 
 */
 
